@@ -14,6 +14,11 @@ class TipCalcViewController: UIViewController {
     var billWhole: Int = 0
     var billChangeString = ""
     var billChange: Int {
+        if billChangeString.count < 2{
+            while billChangeString.count < 2{
+                billChangeString += "0"
+            }
+        }
         guard let returnValue = Int(billChangeString) else {return 0}
         return returnValue
     }
@@ -21,6 +26,7 @@ class TipCalcViewController: UIViewController {
         return Double(billWhole) + (Double(billChange) / 100)
     }
     var tipAmmount: Double = 0.0
+    var tipPercent: Int = 0
     var total: Double = 0.0
     var inDecimal = false
     var tipMode = false //are we in tip mode or are we still entering the bill
@@ -75,9 +81,13 @@ class TipCalcViewController: UIViewController {
                 print("we are in the decimal, lads")
                 self.moneyLabel.text = "$\(billWhole).\(billChangeString)"
             }
-            totalLabel.text = ""
+            if !splitMode{
+                totalLabel.text = ""
+            } else {
+                totalLabel.text = "Total: $\(splitPerPerson) each"
+            }
             operationLabel.text = ""
-            
+            self.tipLabel.text = "Bill Total:"
         } else {
             let tipString = addZeros(toNumber: String(tipAmmount))
             let totalString = addZeros(toNumber: String(Double(billDouble + tipAmmount).rounded(digits: 2)))
@@ -87,8 +97,8 @@ class TipCalcViewController: UIViewController {
             } else {
                 totalLabel.text = "Total: $\(splitPerPerson) each"
             }
+            self.tipLabel.text = "Tip:"
         }
-        
         if splitMode{
             splitLabel.text = "Split \(splitFriends) ways"
         } else {
@@ -138,7 +148,44 @@ class TipCalcViewController: UIViewController {
     //time to do math
     @IBAction func tipButtonTapped(sender: UIButton){
         tipMode = true
-        let percent = Double(sender.tag) / 100
+        var percent:Double = 0
+        if sender.tag != 69{
+            percent = Double(sender.tag) / 100
+            tipPercent = sender.tag
+            calculateTip(percent: percent)
+        } else {
+            let customTipAlert = UIAlertController(title: "Enter custom tip percentage:", message: nil, preferredStyle: .alert)
+            customTipAlert.addTextField { (textField) in
+                textField.keyboardType = .numberPad
+                textField.placeholder = "Tip percentage"
+            }
+            let cancelAction = UIAlertAction(title: "Cancel", style: .destructive) { (_) in
+                self.tipMode = false
+                customTipAlert.dismiss(animated: true, completion: {
+                    //
+                })
+                return
+            }
+            let enterAction = UIAlertAction(title: "Set", style: .default) { (_) in
+                guard var tipText = customTipAlert.textFields?[0].text else {return}
+                guard let tipPercent = Double(tipText)else {return}
+                print(tipPercent)
+                self.tipPercent = Int(tipPercent)
+                percent = tipPercent / Double(100)
+                self.calculateTip(percent: percent)
+                customTipAlert.dismiss(animated: true, completion: {
+                    //
+                })
+            }
+            customTipAlert.addAction(enterAction)
+            customTipAlert.addAction(cancelAction)
+            self.present(customTipAlert, animated: true) {
+                //
+            }
+        }
+    }
+    
+    func calculateTip(percent: Double){
         if billChangeString.count < 2{
             while billChangeString.count < 2{
                 billChangeString += "0"
@@ -150,12 +197,40 @@ class TipCalcViewController: UIViewController {
         self.updateViews()
     }
     
+    @IBAction func unsplitButtonTapped(_ sender: Any) {
+        self.splitMode = false
+        self.splitFriends = 1
+        self.updateViews()
+    }
+    
     @IBAction func dotButtonTapped(_ sender: Any) {
         if inDecimal == false{
             inDecimal = true
         }
         self.updateViews()
     }
+    
+    @IBAction func receiptButtonTapped(_ sender: Any) {
+        var message = ""
+        message += "\n Subtotal: $\(addZeros(toNumber: String(billDouble)))\n \n"
+        if (tipMode){
+            message += "Tip: $\(tipAmmount) (\(self.tipPercent)%)\n \n"
+            message += "Total: $\(Double(billDouble + tipAmmount).rounded(digits: 2))\n \n"
+        }
+        if splitMode{
+            message += "Split between \(splitFriends) parties \n \n"
+            message += "$\(splitPerPerson) each (rounded up)"
+        }
+        let receiptAlert = UIAlertController(title: "Detailed Total", message: message, preferredStyle: .alert)
+        let closeAction = UIAlertAction(title: "Close", style: .destructive) { (_) in
+            //
+        }
+        receiptAlert.addAction(closeAction)
+        self.present(receiptAlert, animated: true) {
+            //
+        }
+    }
+    
     
     //Splitskies
     @IBAction func splitButtonPressed(_ sender: UIButton) {
